@@ -1,0 +1,3 @@
+(library
+ (name geoviz)
+ (libraries claudius domainslib tiff tiff.unix csv h3 yojson))

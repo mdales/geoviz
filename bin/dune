@@ -1,0 +1,4 @@
+(executable
+ (public_name geoviz)
+ (name main)
+ (libraries geoviz claudius domainslib))
