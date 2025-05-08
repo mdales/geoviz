@@ -140,12 +140,11 @@ let tick t s prev (inputs : Base.input_state) =
 	let event_state = match Domainslib.Chan.recv_poll outputQ with
 	| None -> !state
 	| Some msg -> (
-		Printf.printf "msg\n";
 		match msg with
 		| Worker.Result data -> Showing data
 		| Error msg -> (
 			Printf.printf "error: %s\n" msg;
-			!state
+			Waiting
 		)
 	) in
 
