@@ -79,21 +79,23 @@ let geometry v =
                  convert_coords coordinates)
                list_of_coords)
            list_of_list_of_coords)
-  | "MultiPolygon" -> 
+  | "MultiPolygon" ->
       let list_of_list_of_list_of_coords =
         geometry |> member "coordinates" |> to_list
       in
-      MultiPolygon (
-        List.map (fun list_of_list_of_coords ->
-          List.map
-             (fun line_node ->
-               let list_of_coords = to_list line_node in
-               List.filter_map
-                 (fun point_list ->
-                   let coordinates = to_list point_list in
-                   convert_coords coordinates)
-                 list_of_coords)
-             (to_list list_of_list_of_coords)) list_of_list_of_list_of_coords)
+      MultiPolygon
+        (List.map
+           (fun list_of_list_of_coords ->
+             List.map
+               (fun line_node ->
+                 let list_of_coords = to_list line_node in
+                 List.filter_map
+                   (fun point_list ->
+                     let coordinates = to_list point_list in
+                     convert_coords coordinates)
+                   list_of_coords)
+               (to_list list_of_list_of_coords))
+           list_of_list_of_list_of_coords)
   | _ -> None
 
 let property_keys v =
