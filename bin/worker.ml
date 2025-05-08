@@ -146,7 +146,9 @@ let load_data_from_file filename outputQ =
 let rec worker inputQ outputQ =
   match Domainslib.Chan.recv inputQ with
   | Task filename ->
-      (try load_data_from_file filename outputQ
-       with Invalid_argument msg -> Domainslib.Chan.send outputQ (Error msg));
+      (try load_data_from_file filename outputQ with
+      | Invalid_argument msg -> Domainslib.Chan.send outputQ (Error msg)
+      | Yojson__Basic.Util.Type_error (msg, _) ->
+          Domainslib.Chan.send outputQ (Error msg));
       worker inputQ outputQ
   | Quit -> ()

@@ -1,18 +1,21 @@
 open Claudius
 open Geoviz.Graphics
 
-type state = Waiting | Loading of string | Showing of (elem * float) list
+type state =
+  | Waiting of string option
+  | Loading of string
+  | Showing of (elem * float) list
 
 (* let state_to_string = function
 	| Waiting -> "waiting"
 	| Loading fn -> Printf.sprintf "loading %s" fn
 	| Showing data -> Printf.sprintf "showing %d" (List.length data) *)
 
-let state = ref Waiting
+let state = ref (Waiting None)
 let inputQ = Domainslib.Chan.make_unbounded ()
 let outputQ = Domainslib.Chan.make_unbounded ()
 
-let initial_screen s =
+let initial_screen optmsg s =
   let width, height = Screen.dimensions s in
   let fb = Framebuffer.init (width, height) (fun _ _ -> 0) in
   let msg = "Drop file here" in
@@ -21,6 +24,16 @@ let initial_screen s =
     (Framebuffer.draw_string
        ((width - msg_width) / 2)
        (height / 2) (Screen.font s) msg 15 fb);
+  (match optmsg with
+  | None -> ()
+  | Some msg ->
+      let msg_width =
+        Framebuffer.draw_string 2000 2000 (Screen.font s) msg 15 fb
+      in
+      ignore
+        (Framebuffer.draw_string
+           ((width - msg_width) / 2)
+           10 (Screen.font s) msg 15 fb));
   fb
 
 let handle_file_drop filename current_state =
@@ -32,7 +45,9 @@ let handle_file_drop filename current_state =
       | ".geojson" | ".csv" | ".tif" | ".tiff" ->
           Domainslib.Chan.send inputQ (Worker.Task filename);
           Loading filename
-      | _ -> Waiting)
+      | ext ->
+          Waiting (Some (Printf.sprintf "File extension %s not recognised" ext))
+      )
 
 let loading_screen s filename =
   let width, height = Screen.dimensions s in
@@ -124,9 +139,7 @@ let tick t s prev (inputs : Base.input_state) =
     | Some msg -> (
         match msg with
         | Worker.Result data -> Showing data
-        | Error msg ->
-            Printf.printf "error: %s\n" msg;
-            Waiting)
+        | Error msg -> Waiting (Some msg))
   in
 
   let filename =
@@ -141,8 +154,12 @@ let tick t s prev (inputs : Base.input_state) =
     match (!state, event_state, input_state) with
     | Loading _, Loading _, Loading _ -> (update_loading_screen t s prev, !state)
     | Loading _, Showing data, _ -> (render_data t s data, event_state)
+    | Loading _, Waiting msg, _ -> (initial_screen msg s, event_state)
     | Showing _, Showing data, Showing _ -> (render_data t s data, event_state)
     | _, _, Loading fn -> (loading_screen s fn, input_state)
+    | Waiting a, _, Waiting b ->
+        ((if a == b then prev else initial_screen b s), !state)
+    | Showing _, _, Waiting msg -> (initial_screen msg s, input_state)
     | _ -> (prev, !state)
   in
   state := new_state;
@@ -154,6 +171,6 @@ let () =
     (Palette.to_list (Palette.generate_mac_palette ())
     @ Palette.to_list (Palette.generate_plasma_palette (256 - 16)))
   |> Screen.create 1024 1024 1
-  |> Base.run "Geoviz" (Some initial_screen) tick;
+  |> Base.run "Geoviz" (Some (initial_screen None)) tick;
   Domainslib.Chan.send inputQ Worker.Quit;
   Domain.join worker
