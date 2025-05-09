@@ -33,7 +33,7 @@ let load_data_from_geojson filename outputQ =
     List.concat_map
       (fun feat ->
         match Feature.geometry feat with
-        | Point coord -> [ (Point (coord_to_vec coord), 1.0) ]
+        | Point coord -> [ Point (coord_to_vec coord, Float 1.0) ]
         | MultiLineString lines ->
             List.concat_map
               (fun coordinate_list ->
@@ -42,7 +42,7 @@ let load_data_from_geojson filename outputQ =
                 | hd1 :: hd2 :: tl ->
                     let rec loop last next rest acc =
                       let n =
-                        (Line (coord_to_vec last, coord_to_vec next), 1.0)
+                        Line (coord_to_vec last, coord_to_vec next, Float 1.0)
                         :: acc
                       in
                       match rest with [] -> n | hd :: tl -> loop next hd tl n
@@ -55,14 +55,16 @@ let load_data_from_geojson filename outputQ =
       *)
             match coordinate_list_list with
             | coordinate_list :: _ ->
-                [ (Polygon (List.map coord_to_vec coordinate_list), 1.0) ]
+                [ Polygon (List.map coord_to_vec coordinate_list, Float 1.0) ]
             | _ -> [])
         | MultiPolygon coordinate_list_list_list ->
             List.concat_map
               (fun coordinate_list_list ->
                 match coordinate_list_list with
                 | coordinate_list :: _ ->
-                    [ (Polygon (List.map coord_to_vec coordinate_list), 1.0) ]
+                    [
+                      Polygon (List.map coord_to_vec coordinate_list, Float 1.0);
+                    ]
                 | _ -> [])
               coordinate_list_list_list
         | _ -> [])
@@ -95,8 +97,9 @@ let load_data_from_csv filename outputQ =
                 match boundary with
                 | [] -> acc
                 | _ ->
-                    ( Polygon (List.map h3_lat_lng_to_vec boundary),
-                      Float.of_string value /. max_val )
+                    Polygon
+                      ( List.map h3_lat_lng_to_vec boundary,
+                        Float (Float.of_string value /. max_val) )
                     :: acc)
             | _ -> failwith "unable to parse CSV row")
           ~init:[] csv_inc
@@ -126,10 +129,10 @@ let load_data_from_geotiff filename outputQ =
       let value = data1d.{0, x * scale} in
       let longitude = xorigin +. (xscale *. float_of_int (x * scale)) in
       let coord : Feature.coord = { longitude; latitude } in
-      let p =
-        ( Point (coord_to_vec coord),
-          if value == 0 then 0. else 0.5 +. (float_of_int value /. 12000.) )
+      let col =
+        if value == 0 then 0. else 0.5 +. (float_of_int value /. 12000.)
       in
+      let p = Point (coord_to_vec coord, Float col) in
       res := p :: !res
     done;
     Domainslib.Chan.send outputQ (Result !res)

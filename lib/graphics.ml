@@ -1,10 +1,11 @@
 type vec = { x : float; y : float; z : float }
+type value = Float of float | Int of int
 
 type elem =
-  | Point of vec
-  | Line of vec * vec
-  | Triangle of vec * vec * vec
-  | Polygon of vec list
+  | Point of vec * value
+  | Line of vec * vec * value
+  | Triangle of vec * vec * vec * value
+  | Polygon of vec list * value
 
 let rotate_x (a : float) (p : vec) : vec =
   {
@@ -33,10 +34,10 @@ let point_z_cmp (a : vec) (b : vec) : int =
 let get_represent_vec elem =
   (* at some point this could be the mid point *)
   match elem with
-  | Point v -> v
-  | Line (a, _) -> a
-  | Triangle (a, _, _) -> a
-  | Polygon al -> List.nth al 0
+  | Point (v, _) -> v
+  | Line (a, _, _) -> a
+  | Triangle (a, _, _, _) -> a
+  | Polygon (al, _) -> List.nth al 0
 
 let element_z_cmp (a : elem) (b : elem) : int =
   point_z_cmp (get_represent_vec a) (get_represent_vec b)

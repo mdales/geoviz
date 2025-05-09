@@ -4,7 +4,7 @@ open Geoviz.Graphics
 type state =
   | Waiting of string option
   | Loading of string
-  | Showing of (elem * float) list
+  | Showing of elem list
 
 (* let state_to_string = function
 	| Waiting -> "waiting"
@@ -82,25 +82,33 @@ let project s (v : vec) : Primitives.point =
     y = (height / 2) + (int_of_float (m *. v.y /. (v.z +. 400.)) / 1);
   }
 
-let render_to_primitives (_ft : float) (s : Screen.t)
-    (elements : (elem * float) list) : Primitives.t list =
+let val_to_col palette_size = function
+  | Float v -> Int.of_float (Float.of_int palette_size *. v)
+  | Int v -> v mod palette_size
+
+let render_to_primitives (_ft : float) (s : Screen.t) (elements : elem list) :
+    Primitives.t list =
   let palette_size = Palette.size (Screen.palette s) - 1 in
+  let val_to_col_p = val_to_col palette_size in
   List.filter_map
-    (fun (e, c) ->
-      let col = Int.of_float (Float.of_int palette_size *. c) in
+    (fun e ->
       match e with
-      | Point e ->
+      | Point (e, v) ->
+          let col = val_to_col_p v in
           if e.z > 0. then None
           else Some (Primitives.Pixel (project s e, if col = 0 then 1 else 3))
-      | Line (a, b) ->
+      | Line (a, b, v) ->
+          let col = val_to_col_p v in
           Some
             (Primitives.Line
                (project s a, project s b, col / if a.z < 0. then 1 else 3))
-      | Triangle (a, b, c) ->
+      | Triangle (a, b, c, v) ->
+          let col = val_to_col_p v in
           Some
             (Primitives.FilledTriangle
                (project s a, project s b, project s c, col))
-      | Polygon vl ->
+      | Polygon (vl, v) ->
+          let col = val_to_col_p v in
           let rep = get_represent_vec e in
           Some
             (Primitives.FilledPolygon
@@ -110,10 +118,10 @@ let render_to_primitives (_ft : float) (s : Screen.t)
 let rotate_element angle e =
   let rfunc x = rotate_x 0.1 (rotate_y angle x) in
   match e with
-  | Point v -> Point (rfunc v)
-  | Line (a, b) -> Line (rfunc a, rfunc b)
-  | Triangle (a, b, c) -> Triangle (rfunc a, rfunc b, rfunc c)
-  | Polygon vl -> Polygon (List.map rfunc vl)
+  | Point (a, v) -> Point (rfunc a, v)
+  | Line (a, b, v) -> Line (rfunc a, rfunc b, v)
+  | Triangle (a, b, c, v) -> Triangle (rfunc a, rfunc b, rfunc c, v)
+  | Polygon (vl, v) -> Polygon (List.map rfunc vl, v)
 
 let render_data t s elements =
   let w, h = Screen.dimensions s in
@@ -121,10 +129,8 @@ let render_data t s elements =
 
   let ft = Float.of_int t in
 
-  List.map
-    (fun (coord, col) -> (rotate_element (0.01 *. ft) coord, col))
-    elements
-  |> List.sort (fun (a, _) (b, _) -> element_z_cmp a b)
+  List.map (rotate_element (0.01 *. ft)) elements
+  |> List.sort (fun a b -> element_z_cmp a b)
   (* |> List.filter_map (fun p ->
 			 if p.z < 0. then Some p else None
 		 )*)
