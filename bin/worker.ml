@@ -106,8 +106,9 @@ let load_data_from_csv filename outputQ =
       in
       Domainslib.Chan.send outputQ (Result res))
 
-let load_data_from_geotiff filename outputQ =
-  Tiff_unix.with_open_in filename @@ fun ro ->
+let load_data_from_geotiff fs filename outputQ =
+  Eio.Path.(with_open_in (fs / filename)) @@ fun r ->
+  let ro = Eio.File.pread_exact r in
   let tiff = Tiff.from_file ro in
   let ifd = Tiff.ifd tiff in
   let width = Tiff.Ifd.width ifd and height = Tiff.Ifd.height ifd in
@@ -138,18 +139,20 @@ let load_data_from_geotiff filename outputQ =
     Domainslib.Chan.send outputQ (Result !res)
   done
 
-let load_data_from_file filename outputQ =
+let load_data_from_file fs filename outputQ =
   match Filename.extension filename with
   | ".geojson" -> load_data_from_geojson filename outputQ
   | ".csv" -> load_data_from_csv filename outputQ
-  | ".tif" | ".tiff" -> load_data_from_geotiff filename outputQ
+  | ".tif" | ".tiff" -> load_data_from_geotiff fs filename outputQ
   | _ ->
       invalid_arg (Printf.sprintf "Unrecognised file extension on %s" filename)
 
 let rec worker inputQ outputQ =
+  Eio_main.run @@ fun env ->
+  let fs = Eio.Stdenv.fs env in
   match Domainslib.Chan.recv inputQ with
   | Task filename ->
-      (try load_data_from_file filename outputQ with
+      (try load_data_from_file fs filename outputQ with
       | Invalid_argument msg -> Domainslib.Chan.send outputQ (Error msg)
       | Yojson__Basic.Util.Type_error (msg, _) ->
           Domainslib.Chan.send outputQ (Error msg));

@@ -1,4 +1,4 @@
 (executable
  (public_name geoviz)
  (name main)
- (libraries geoviz claudius domainslib))
+ (libraries eio_main geoviz claudius domainslib))
